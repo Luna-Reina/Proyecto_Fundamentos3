@@ -8,8 +8,8 @@ public class GrafoLaberinto {
     private char[][] matriz;
     private int filas;
     private int columnas;
-    private Nodo inicio;
-    private Nodo fin;
+    private Nodo entrada;
+    private Nodo salida;
     private final Map<Nodo, List<Arista>> adyacencia;
 
     public GrafoLaberinto() {
@@ -18,18 +18,20 @@ public class GrafoLaberinto {
 
     public void cargarDesdeArchivo(String ruta) throws Exception {
         File archivo = new File(ruta);
-        if (!archivo.exists() || !archivo.isFile()) {
-            throw new IOException("El archivo '" + ruta + "' no existe o no es una ruta válida.");
+        if (!archivo.exists() || !archivo.isFile() || !archivo.canRead()) {
+            throw new IOException("El archivo '" + ruta + "' no existe o no se puede leer.");
         }
 
         List<String> lineas = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new FileReader(archivo))) {
             String linea;
             while ((linea = br.readLine()) != null) {
-                if (!linea.isEmpty()) {
-                    lineas.add(linea);
-                }
+                lineas.add(linea);
             }
+        }
+
+        while (!lineas.isEmpty() && lineas.get(lineas.size() - 1).isEmpty()) {
+            lineas.remove(lineas.size() - 1);
         }
 
         if (lineas.isEmpty()) {
@@ -37,38 +39,48 @@ public class GrafoLaberinto {
         }
 
         int ancho = lineas.get(0).length();
+        if (ancho == 0) {
+            throw new Exception("El primer renglón está vacío (longitud 0).");
+        }
+
         for (int i = 0; i < lineas.size(); i++) {
             if (lineas.get(i).length() != ancho) {
-                throw new Exception("La fila " + (i + 1) + " mide " + lineas.get(i).length() +
-                        " caracteres, pero se esperaba " + ancho + ".");
+                throw new Exception("El renglón " + (i + 1) + " tiene longitud " + lineas.get(i).length() +
+                        ", pero todos deben medir " + ancho + ".");
             }
         }
 
         int nFilas = lineas.size();
         char[][] matrizTemp = new char[nFilas][ancho];
-        Nodo inicioTemp = null;
-        Nodo finTemp = null;
-        String validos = "#+-|. SE123456789";
+        Nodo entradaTemp = null;
+        Nodo salidaTemp = null;
+        String validos = "+-| #ES";
 
         for (int r = 0; r < nFilas; r++) {
             for (int c = 0; c < ancho; c++) {
                 char ch = lineas.get(r).charAt(c);
+                if (ch == '\t') {
+                    throw new Exception("El archivo contiene tabulaciones (renglón " + (r + 1) + "); usa espacios.");
+                }
                 if (validos.indexOf(ch) == -1) {
-                    throw new Exception("Carácter inválido '" + ch + "' en fila " + r + ", columna " + c + ".");
+                    throw new Exception("Carácter inválido '" + ch + "' en renglón " + (r + 1) + ", columna " + (c + 1) + ".");
                 }
                 matrizTemp[r][c] = ch;
-                if (ch == 'S') {
-                    if (inicioTemp != null) throw new Exception("El laberinto tiene más de un inicio 'S'.");
-                    inicioTemp = new Nodo(r, c);
-                } else if (ch == 'E') {
-                    if (finTemp != null) throw new Exception("El laberinto tiene más de una salida 'E'.");
-                    finTemp = new Nodo(r, c);
+                if (ch == 'E') {
+                    if (entradaTemp != null) throw new Exception("Hay más de una entrada 'E'.");
+                    entradaTemp = new Nodo(r, c);
+                } else if (ch == 'S') {
+                    if (salidaTemp != null) throw new Exception("Hay más de una salida 'S'.");
+                    salidaTemp = new Nodo(r, c);
                 }
             }
         }
 
-        // Mecanismo automático si el archivo viene directo de delorie.com sin 'S' ni 'E'
-        if (inicioTemp == null && finTemp == null) {
+        if (entradaTemp != null || salidaTemp != null) {
+            if (entradaTemp == null || salidaTemp == null) {
+                throw new Exception("Si usas marcas explícitas, debe haber exactamente una 'E' y una 'S'.");
+            }
+        } else {
             List<Nodo> aberturasBorde = new ArrayList<>();
             for (int r = 0; r < nFilas; r++) {
                 for (int c = 0; c < ancho; c++) {
@@ -78,34 +90,27 @@ public class GrafoLaberinto {
                     }
                 }
             }
-            if (aberturasBorde.size() < 2) {
-                throw new Exception("No se encontraron marcadores 'S'/'E' ni dos aberturas en los bordes.");
+            if (aberturasBorde.size() != 2) {
+                throw new Exception("Sin marcas 'E' y 'S', el perímetro debe tener exactamente 2 posiciones transitables (se encontraron " + aberturasBorde.size() + ").");
             }
-            inicioTemp = aberturasBorde.get(0);
-            finTemp = aberturasBorde.get(aberturasBorde.size() - 1);
-        } else if (inicioTemp == null || finTemp == null) {
-            throw new Exception("Falta uno de los marcadores: debe haber tanto 'S' como 'E'.");
+            entradaTemp = aberturasBorde.get(0);
+            salidaTemp = aberturasBorde.get(aberturasBorde.size() - 1);
         }
 
         this.matriz = matrizTemp;
         this.filas = nFilas;
         this.columnas = ancho;
-        this.inicio = inicioTemp;
-        this.fin = finTemp;
+        this.entrada = entradaTemp;
+        this.salida = salidaTemp;
         construirGrafo();
     }
 
     private boolean esPared(char ch) {
-        return ch == '#' || ch == '+' || ch == '-' || ch == '|';
-    }
-
-    private int costoCelda(char ch) {
-        return Character.isDigit(ch) ? Character.getNumericValue(ch) : 1;
+        return ch == '+' || ch == '-' || ch == '|';
     }
 
     private void construirGrafo() {
         adyacencia.clear();
-        // Orden definido: Arriba, Abajo, Izquierda, Derecha
         int[][] dirs = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
         for (int r = 0; r < filas; r++) {
@@ -117,7 +122,7 @@ public class GrafoLaberinto {
                         int nr = r + d[0];
                         int nc = c + d[1];
                         if (nr >= 0 && nr < filas && nc >= 0 && nc < columnas && !esPared(matriz[nr][nc])) {
-                            vecinos.add(new Arista(new Nodo(nr, nc), costoCelda(matriz[nr][nc])));
+                            vecinos.add(new Arista(new Nodo(nr, nc), 1));
                         }
                     }
                     adyacencia.put(actual, vecinos);
@@ -134,10 +139,10 @@ public class GrafoLaberinto {
                 char orig = matriz[r][c];
                 if (actual != null && pos.equals(actual)) {
                     sb.append('@');
-                } else if (pos.equals(inicio)) {
-                    sb.append('S');
-                } else if (pos.equals(fin)) {
+                } else if (pos.equals(entrada)) {
                     sb.append('E');
+                } else if (pos.equals(salida)) {
+                    sb.append('S');
                 } else if (camino != null && camino.contains(pos)) {
                     sb.append('*');
                 } else if (visitados != null && visitados.contains(pos)) {
@@ -153,8 +158,8 @@ public class GrafoLaberinto {
 
     private List<Nodo> reconstruirCamino(Map<Nodo, Nodo> padres) {
         List<Nodo> camino = new ArrayList<>();
-        if (!padres.containsKey(fin) && !inicio.equals(fin)) return camino;
-        Nodo curr = fin;
+        if (!padres.containsKey(salida) && !entrada.equals(salida)) return camino;
+        Nodo curr = salida;
         while (curr != null) {
             camino.add(curr);
             curr = padres.get(curr);
@@ -163,27 +168,18 @@ public class GrafoLaberinto {
         return camino;
     }
 
-    private int calcularCostoCamino(List<Nodo> camino) {
-        int total = 0;
-        for (int i = 1; i < camino.size(); i++) {
-            Nodo n = camino.get(i);
-            total += costoCelda(matriz[n.fila][n.col]);
-        }
-        return total;
-    }
-
     public ResultadoAlgoritmo resolver(String algoritmo, boolean pasoAPaso, int pausaMs) {
         long tInicio = System.nanoTime();
         Set<Nodo> visitadosSet = new HashSet<>();
         List<Nodo> ordenVisita = new ArrayList<>();
         Map<Nodo, Nodo> padres = new HashMap<>();
-        padres.put(inicio, null);
+        padres.put(entrada, null);
         boolean encontrado = false;
 
         switch (algoritmo) {
             case "DFS": {
                 Deque<Nodo> pila = new ArrayDeque<>();
-                pila.push(inicio);
+                pila.push(entrada);
                 while (!pila.isEmpty()) {
                     Nodo actual = pila.pop();
                     if (visitadosSet.contains(actual)) continue;
@@ -193,7 +189,7 @@ public class GrafoLaberinto {
 
                     if (pasoAPaso) imprimirFrame(algoritmo, visitadosSet, actual, ordenVisita.size(), pausaMs);
 
-                    if (actual.equals(fin)) {
+                    if (actual.equals(salida)) {
                         encontrado = true;
                         break;
                     }
@@ -211,8 +207,8 @@ public class GrafoLaberinto {
             }
             case "BFS": {
                 Queue<Nodo> cola = new LinkedList<>();
-                cola.offer(inicio);
-                visitadosSet.add(inicio);
+                cola.offer(entrada);
+                visitadosSet.add(entrada);
 
                 while (!cola.isEmpty()) {
                     Nodo actual = cola.poll();
@@ -220,7 +216,7 @@ public class GrafoLaberinto {
 
                     if (pasoAPaso) imprimirFrame(algoritmo, visitadosSet, actual, ordenVisita.size(), pausaMs);
 
-                    if (actual.equals(fin)) {
+                    if (actual.equals(salida)) {
                         encontrado = true;
                         break;
                     }
@@ -239,16 +235,16 @@ public class GrafoLaberinto {
             case "Dijkstra": {
                 Map<Nodo, Integer> dist = new HashMap<>();
                 for (Nodo n : adyacencia.keySet()) dist.put(n, Integer.MAX_VALUE);
-                dist.put(inicio, 0);
+                dist.put(entrada, 0);
 
-                PriorityQueue<Map.Entry<Nodo, Integer>> pq =
-                        new PriorityQueue<>(Comparator.comparingInt(Map.Entry::getValue));
-                pq.offer(new AbstractMap.SimpleEntry<>(inicio, 0));
+                PriorityQueue<Object[]> pq =
+                        new PriorityQueue<>(Comparator.comparingInt(a -> (int) a[1]));
+                pq.offer(new Object[]{entrada, 0});
 
                 while (!pq.isEmpty()) {
-                    Map.Entry<Nodo, Integer> entry = pq.poll();
-                    Nodo actual = entry.getKey();
-                    int costoAct = entry.getValue();
+                    Object[] entry = pq.poll();
+                    Nodo actual = (Nodo) entry[0];
+                    int costoAct = (int) entry[1];
 
                     if (visitadosSet.contains(actual)) continue;
                     visitadosSet.add(actual);
@@ -256,7 +252,7 @@ public class GrafoLaberinto {
 
                     if (pasoAPaso) imprimirFrame(algoritmo, visitadosSet, actual, ordenVisita.size(), pausaMs);
 
-                    if (actual.equals(fin)) {
+                    if (actual.equals(salida)) {
                         encontrado = true;
                         break;
                     }
@@ -268,7 +264,7 @@ public class GrafoLaberinto {
                             if (nuevoCosto < dist.get(vec)) {
                                 dist.put(vec, nuevoCosto);
                                 padres.put(vec, actual);
-                                pq.offer(new AbstractMap.SimpleEntry<>(vec, nuevoCosto));
+                                pq.offer(new Object[]{vec, nuevoCosto});
                             }
                         }
                     }
@@ -279,14 +275,14 @@ public class GrafoLaberinto {
 
         double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         List<Nodo> camino = encontrado ? reconstruirCamino(padres) : Collections.emptyList();
-        int costoTotal = calcularCostoCamino(camino);
+        int costoTotal = camino.isEmpty() ? 0 : camino.size() - 1;
 
         return new ResultadoAlgoritmo(algoritmo, encontrado, ordenVisita, camino, costoTotal, tiempoMs);
     }
 
     private void imprimirFrame(String algoritmo, Set<Nodo> visitados, Nodo actual, int paso, int pausaMs) {
         System.out.println("\n=== Explorando con " + algoritmo + " | Paso #" + paso + " ===");
-        System.out.println("Leyenda: S=Inicio | E=Salida | @=Actual | ·=Visitado");
+        System.out.println("Leyenda: E=Entrada | S=Salida | @=Actual | ·=Visitado");
         System.out.println(renderizar(visitados, actual, null));
         try {
             Thread.sleep(pausaMs);
