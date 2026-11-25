@@ -1,0 +1,4 @@
+## Estructura del Grafo (Issue #3)
+- **Administración de vértices:** Implementada mediante `Hashtable<Integer, Vertice>` dentro de la clase `Vertices`, asignando un identificador entero único (`id`), fila y columna a cada celda transitable.
+- **Representación de adyacencia elegida:** **Listas ligadas de adyacencia** (`Hashtable<Integer, LinkedList<Arcos>>`) dentro de la clase `Grafo`. Se eligió esta alternativa frente a la matriz de adyacencia porque un laberinto es un grafo disperso (cada celda tiene máximo 4 vecinos ortogonales), reduciendo el consumo de memoria de $O(V^2)$ a $O(V + E)$ y permitiendo recorrer únicamente los vecinos reales en cada paso.
+- **Conexiones:** Grafo no dirigido con costo uniforme `1` en cada objeto `Arcos`.
