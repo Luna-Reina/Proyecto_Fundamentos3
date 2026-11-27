@@ -4,7 +4,9 @@ public class Main {
 
     private static Set<Integer> extraerIds(List<Vertice> lista) {
         Set<Integer> ids = new HashSet<>();
-        for (Vertice v : lista) ids.add(v.getId());
+        for (Vertice v : lista) {
+            ids.add(v.getId());
+        }
         return ids;
     }
 
@@ -42,7 +44,7 @@ public class Main {
         String[] nombres = {"DFS", "BFS", "Dijkstra"};
         for (String nombre : nombres) {
             ResultadoAlgoritmo res = resultados.get(nombre);
-            System.out.println("\n>>> Mapa solución " + nombre + " (* = ruta final, · = explorado):");
+            System.out.println("\n>>> Mapa solución " + nombre + " (* = camino final, · = visitado):");
             if (res.encontrado) {
                 System.out.println(grafo.renderizar(extraerIds(res.ordenVisita), null, extraerIds(res.camino)));
             } else {
@@ -52,16 +54,15 @@ public class Main {
         }
 
         System.out.println("\n----------------------------------------------------------------");
-        System.out.printf("%-12s | %-8s | %-11s | %-11s | %-7s%n",
-                "Algoritmo", "¿Llegó?", "Explorados", "Pasos ruta", "Costo");
+        System.out.printf("%-12s | %-10s | %-12s | %-18s%n",
+                "Algoritmo", "¿Solución?", "Visitados", "Movimientos ruta");
         System.out.println("----------------------------------------------------------------");
         for (String nombre : nombres) {
             ResultadoAlgoritmo r = resultados.get(nombre);
-            String llego = r.encontrado ? "Sí" : "No";
-            String pasos = r.encontrado ? String.valueOf(r.camino.size() - 1) : "-";
-            String costo = r.encontrado ? String.valueOf(r.costoTotal) : "-";
-            System.out.printf("%-12s | %-8s | %-11d | %-11s | %-7s%n",
-                    nombre, llego, r.ordenVisita.size(), pasos, costo);
+            String sol = r.encontrado ? "Sí" : "No";
+            String movs = r.encontrado ? String.valueOf(r.camino.size() - 1) : "Sin camino";
+            System.out.printf("%-12s | %-10s | %-12d | %-18s%n",
+                    nombre, sol, r.ordenVisita.size(), movs);
         }
         System.out.println("----------------------------------------------------------------");
     }
@@ -93,8 +94,7 @@ public class Main {
                     grafo = nuevoGrafo;
                     laberintoCargado = true;
                     resultados.clear();
-                    System.out.println("\n[OK] Laberinto cargado (" + grafo.getVertices().cantidad() +
-                            " vértices) y resultados previos descartados:");
+                    System.out.println("\n[OK] Laberinto cargado correctamente y resultados previos descartados:");
                     System.out.println(grafo.renderizar(null, null, null));
                 } catch (Exception e) {
                     System.out.println("\n[ERROR] No se pudo cargar el laberinto: " + e.getMessage());
@@ -128,6 +128,7 @@ public class Main {
             } else if (opcion.equals("6")) {
                 System.out.println("\nSaliendo del programa... ¡Éxito en su entrega!");
                 break;
+
             } else {
                 System.out.println("\n[ERROR] Opción no válida. Por favor ingresa un número del 1 al 6.");
             }
