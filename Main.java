@@ -10,42 +10,36 @@ public class Main {
         return ids;
     }
 
-    private static void mostrarResultadoIndividual(Grafo grafo, ResultadoAlgoritmo res) {
-        System.out.println("\n--- Resultado " + res.nombre + " ---");
-        Set<Integer> visitadosIds = extraerIds(res.ordenVisita);
+    private static void ejecutarYDesplegarPasoAPaso(Grafo grafo, ResultadoAlgoritmo res, Scanner scanner) {
+        System.out.println("\n¿Cómo deseas visualizar la exploración paso a paso?");
+        System.out.println("1. Pausa automática (configurable en milisegundos)");
+        System.out.println("2. Manual (avanzar presionando ENTER)");
+        System.out.print("Elige modo (1 o 2): ");
+        String modo = scanner.nextLine().trim();
 
-        if (!res.encontrado) {
-            System.out.println(grafo.renderizar(visitadosIds, null, null));
-            System.out.println("\n[SIN SOLUCIÓN] No existe camino entre la entrada y la salida.");
-            System.out.println("* Vértices visitados : " + res.ordenVisita.size());
-            System.out.printf("* Tiempo de ejecución   : %.4f ms%n", res.tiempoMs);
-            return;
+        if (modo.equals("2")) {
+            grafo.despliegaLaberinto(res, true, 0, scanner);
+        } else {
+            System.out.print("Ingresa la pausa en milisegundos (ej. 150, Enter para 150): ");
+            String pausaStr = scanner.nextLine().trim();
+            int pausaMs = 150;
+            if (!pausaStr.isEmpty()) {
+                try {
+                    pausaMs = Math.max(0, Integer.parseInt(pausaStr));
+                } catch (NumberFormatException e) {
+                    System.out.println("[INFO] Valor no numérico; usando 150 ms por defecto.");
+                }
+            }
+            grafo.despliegaLaberinto(res, false, pausaMs, scanner);
         }
-
-        Set<Integer> caminoIds = extraerIds(res.camino);
-        System.out.println(grafo.renderizar(visitadosIds, null, caminoIds));
-        System.out.println("\n* Vértices visitados     : " + res.ordenVisita.size());
-        System.out.println("* Longitud (movimientos) : " + (res.camino.size() - 1));
-        System.out.printf("* Tiempo ejecución       : %.4f ms%n", res.tiempoMs);
     }
 
     private static void compararSoluciones(Grafo grafo, Map<String, ResultadoAlgoritmo> resultados) {
-        System.out.println("----------------------------------------------------------");
-        System.out.println("           COMPARACIÓN DE LAS TRES SOLUCIONES");
-        System.out.println("----------------------------------------------------------");
+        System.out.println("COMPARACIÓN DE LAS TRES SOLUCIONES");
 
-        if (!resultados.containsKey("DFS")) {
-            grafo.DFS();
-            resultados.put("DFS", grafo.getUltimoResultado());
-        }
-        if (!resultados.containsKey("BFS")) {
-            grafo.BFS();
-            resultados.put("BFS", grafo.getUltimoResultado());
-        }
-        if (!resultados.containsKey("Dijkstra")) {
-            grafo.caminoMasCorto();
-            resultados.put("Dijkstra", grafo.getUltimoResultado());
-        }
+        if (!resultados.containsKey("DFS")) resultados.put("DFS", grafo.DFS());
+        if (!resultados.containsKey("BFS")) resultados.put("BFS", grafo.BFS());
+        if (!resultados.containsKey("Dijkstra")) resultados.put("Dijkstra", grafo.caminoMasCorto());
 
         String[] nombres = {"DFS", "BFS", "Dijkstra"};
         for (String nombre : nombres) {
@@ -54,8 +48,8 @@ public class Main {
             if (res.encontrado) {
                 System.out.println(grafo.renderizar(extraerIds(res.ordenVisita), null, extraerIds(res.camino)));
             } else {
+                System.out.println("Sin solución (explorados = ·):");
                 System.out.println(grafo.renderizar(extraerIds(res.ordenVisita), null, null));
-                System.out.println("No existe camino hacia la salida.");
             }
         }
 
@@ -80,16 +74,13 @@ public class Main {
         Map<String, ResultadoAlgoritmo> resultados = new HashMap<>();
 
         while (true) {
-            System.out.println("\n------------------------------------------");
-            System.out.println("      RESOLUTOR DE LABERINTOS (GRAFOS)");
-            System.out.println("--------------------------------------------");
+            System.out.println("RESOLUTOR DE LABERINTOS (GRAFOS)");
             System.out.println("1. Cargar laberinto");
             System.out.println("2. Resolver laberinto con DFS");
             System.out.println("3. Resolver laberinto con BFS");
             System.out.println("4. Resolver laberinto con Dijkstra (camino más corto)");
             System.out.println("5. Mostrar las tres soluciones");
             System.out.println("6. Salir");
-            System.out.println("---------------------------------------------");
             System.out.print("Selecciona una opción (1-6): ");
 
             String opcion = scanner.nextLine().trim();
@@ -119,23 +110,17 @@ public class Main {
                 }
 
                 if (opcion.equals("2")) {
-                    grafo.ejecutarDFS(true, 120);
-                    ResultadoAlgoritmo res = grafo.getUltimoResultado();
+                    ResultadoAlgoritmo res = grafo.DFS();
                     resultados.put("DFS", res);
-                    mostrarResultadoIndividual(grafo, res);
-
+                    ejecutarYDesplegarPasoAPaso(grafo, res, scanner);
                 } else if (opcion.equals("3")) {
-                    grafo.ejecutarBFS(true, 120);
-                    ResultadoAlgoritmo res = grafo.getUltimoResultado();
+                    ResultadoAlgoritmo res = grafo.BFS();
                     resultados.put("BFS", res);
-                    mostrarResultadoIndividual(grafo, res);
-
+                    ejecutarYDesplegarPasoAPaso(grafo, res, scanner);
                 } else if (opcion.equals("4")) {
-                    grafo.ejecutarDijkstra(true, 120);
-                    ResultadoAlgoritmo res = grafo.getUltimoResultado();
+                    ResultadoAlgoritmo res = grafo.caminoMasCorto();
                     resultados.put("Dijkstra", res);
-                    mostrarResultadoIndividual(grafo, res);
-
+                    ejecutarYDesplegarPasoAPaso(grafo, res, scanner);
                 } else {
                     compararSoluciones(grafo, resultados);
                 }
