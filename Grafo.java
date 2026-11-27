@@ -2,27 +2,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
-/**
- * Representación de un laberinto como grafo no dirigido ponderado (costo = 1).
- * Alternativa elegida para adyacencia: LISTAS LIGADAS DE ADYACENCIA
- * (Hashtable<Integer, LinkedList<Arcos>>), ya que un laberinto es un grafo disperso
- * (máximo 4 vecinos por celda) y evita desperdiciar memoria O(V^2) de una matriz.
- */
 public class Grafo {
     private char[][] matriz;
     private int filas;
@@ -33,25 +14,46 @@ public class Grafo {
     private final Vertices vertices;
     private final Hashtable<Integer, LinkedList<Arcos>> listasAdyacencia;
 
+
+    private List<Vertice> ultimoCamino;
+    private boolean solucionEncontrada;
+    private ResultadoAlgoritmo ultimoResultado;
+
     public Grafo() {
         this.vertices = new Vertices();
         this.listasAdyacencia = new Hashtable<>();
+        this.ultimoCamino = new ArrayList<>();
+        this.solucionEncontrada = false;
+    }
+
+    public List<Vertice> getUltimoCamino() {
+        return Collections.unmodifiableList(ultimoCamino);
+    }
+
+    public boolean isSolucionEncontrada() {
+        return solucionEncontrada;
+    }
+
+    public ResultadoAlgoritmo getUltimoResultado() {
+        return ultimoResultado;
     }
 
     public void cargarDesdeArchivo(String ruta) throws Exception {
         File archivo = new File(ruta);
-        if (!archivo.exists() || !archivo.isFile()) {
-            throw new IOException("El archivo '" + ruta + "' no existe.");
+        if (!archivo.exists() || !archivo.isFile() || !archivo.canRead()) {
+            throw new IOException("El archivo '" + ruta + "' no existe o no se puede leer.");
         }
 
         List<String> lineas = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new FileReader(archivo))) {
             String linea;
             while ((linea = br.readLine()) != null) {
-                if (!linea.isEmpty()) {
-                    lineas.add(linea);
-                }
+                lineas.add(linea);
             }
+        }
+
+        while (!lineas.isEmpty() && lineas.get(lineas.size() - 1).isEmpty()) {
+            lineas.remove(lineas.size() - 1);
         }
 
         if (lineas.isEmpty()) {
@@ -59,6 +61,10 @@ public class Grafo {
         }
 
         int ancho = lineas.get(0).length();
+        if (ancho == 0) {
+            throw new Exception("El primer renglón tiene longitud 0.");
+        }
+
         for (int i = 0; i < lineas.size(); i++) {
             if (lineas.get(i).length() != ancho) {
                 throw new Exception("La fila " + (i + 1) + " mide " + lineas.get(i).length() +
@@ -70,27 +76,33 @@ public class Grafo {
         char[][] matrizTemp = new char[nFilas][ancho];
         int[] coordInicio = null;
         int[] coordFin = null;
-        String validos = "#+-|. SE123456789";
+        String validos = "+-| #ES";
 
         for (int r = 0; r < nFilas; r++) {
             for (int c = 0; c < ancho; c++) {
                 char ch = lineas.get(r).charAt(c);
+                if (ch == '\t') {
+                    throw new Exception("El archivo contiene tabulaciones en fila " + (r + 1) + "; usa espacios.");
+                }
                 if (validos.indexOf(ch) == -1) {
                     throw new Exception("Carácter inválido '" + ch + "' en (" + r + "," + c + ").");
                 }
                 matrizTemp[r][c] = ch;
-                if (ch == 'S') {
-                    if (coordInicio != null) throw new Exception("Hay más de un inicio 'S'.");
+                if (ch == 'E') {
+                    if (coordInicio != null) throw new Exception("Hay más de una entrada 'E'.");
                     coordInicio = new int[]{r, c};
-                } else if (ch == 'E') {
-                    if (coordFin != null) throw new Exception("Hay más de una salida 'E'.");
+                } else if (ch == 'S') {
+                    if (coordFin != null) throw new Exception("Hay más de una salida 'S'.");
                     coordFin = new int[]{r, c};
                 }
             }
         }
 
-        // Mecanismo automático en bordes si no vienen 'S' y 'E' explícitas
-        if (coordInicio == null && coordFin == null) {
+        if (coordInicio != null || coordFin != null) {
+            if (coordInicio == null || coordFin == null) {
+                throw new Exception("Debe existir tanto 'E' (entrada) como 'S' (salida).");
+            }
+        } else {
             List<int[]> aberturas = new ArrayList<>();
             for (int r = 0; r < nFilas; r++) {
                 for (int c = 0; c < ancho; c++) {
@@ -100,23 +112,24 @@ public class Grafo {
                     }
                 }
             }
-            if (aberturas.size() < 2) {
-                throw new Exception("No se encontraron 'S'/'E' ni al menos dos aberturas en los bordes.");
+            if (aberturas.size() != 2) {
+                throw new Exception("Sin marcas 'E'/'S', debe haber exactamente 2 aberturas en el borde (se hallaron " + aberturas.size() + ").");
             }
             coordInicio = aberturas.get(0);
-            coordFin = aberturas.get(aberturas.size() - 1);
-        } else if (coordInicio == null || coordFin == null) {
-            throw new Exception("Debe existir tanto 'S' como 'E'.");
+            coordFin = aberturas.get(1);
         }
 
         this.matriz = matrizTemp;
         this.filas = nFilas;
         this.columnas = ancho;
+        this.ultimoCamino = new ArrayList<>();
+        this.solucionEncontrada = false;
+        this.ultimoResultado = null;
         construirGrafo(coordInicio, coordFin);
     }
 
     private boolean esPared(char ch) {
-        return ch == '#' || ch == '+' || ch == '-' || ch == '|';
+        return ch == '+' || ch == '-' || ch == '|';
     }
 
     private void construirGrafo(int[] coordInicio, int[] coordFin) {
@@ -126,7 +139,6 @@ public class Grafo {
         int contadorId = 1;
         Vertice[][] mapaTemp = new Vertice[filas][columnas];
 
-        // 1. Crear cada posición transitable como un Vertice con identificador único
         for (int r = 0; r < filas; r++) {
             for (int c = 0; c < columnas; c++) {
                 if (!esPared(matriz[r][c])) {
@@ -141,8 +153,8 @@ public class Grafo {
             }
         }
 
-        // 2. Conectar vecinos horizontales o verticales (sin diagonales) como grafo no dirigido con costo 1
-        int[][] dirs = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}; // Arriba, Abajo, Izquierda, Derecha
+        // Orden Arriba, Derecha, Abajo, Izquierda
+        int[][] dirs = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
         for (int r = 0; r < filas; r++) {
             for (int c = 0; c < columnas; c++) {
                 Vertice actual = mapaTemp[r][c];
@@ -160,17 +172,31 @@ public class Grafo {
         }
     }
 
-    // =========================================================================
-    // MÉTODOS REQUERIDOS POR EL ISSUE #3: DFS(), BFS() y caminoMasCorto()
-    // =========================================================================
 
-    public ResultadoAlgoritmo DFS(boolean pasoAPaso, int pausaMs) {
+    // CONTRATOS OFICIALES ISSUE 4: List<Vertice> DFS(), BFS(), caminoMasCorto()
+
+
+    public List<Vertice> DFS() {
+        return ejecutarDFS(false, 0);
+    }
+
+    public List<Vertice> BFS() {
+        return ejecutarBFS(false, 0);
+    }
+
+    public List<Vertice> caminoMasCorto() {
+        return ejecutarDijkstra(false, 0);
+    }
+
+    public List<Vertice> ejecutarDFS(boolean pasoAPaso, int pausaMs) {
         long tInicio = System.nanoTime();
+        this.ultimoCamino = new ArrayList<>();
+        this.solucionEncontrada = false;
+
         Set<Integer> visitadosIds = new HashSet<>();
         List<Vertice> ordenVisita = new ArrayList<>();
         Map<Integer, Integer> padres = new HashMap<>();
         padres.put(inicio.getId(), null);
-        boolean encontrado = false;
 
         Deque<Vertice> pila = new ArrayDeque<>();
         pila.push(inicio);
@@ -185,53 +211,61 @@ public class Grafo {
             if (pasoAPaso) imprimirFrame("DFS", visitadosIds, actual, ordenVisita.size(), pausaMs);
 
             if (actual.equals(fin)) {
-                encontrado = true;
+                this.solucionEncontrada = true;
                 break;
             }
 
+  
             LinkedList<Arcos> vecinos = listasAdyacencia.get(actual.getId());
             for (int i = vecinos.size() - 1; i >= 0; i--) {
                 Vertice vec = vecinos.get(i).getDestino();
                 if (!visitadosIds.contains(vec.getId())) {
-                    padres.putIfAbsent(vec.getId(), actual.getId());
+                    padres.put(vec.getId(), actual.getId());
                     pila.push(vec);
                 }
             }
         }
 
         double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
-        List<Vertice> camino = encontrado ? reconstruirCamino(padres) : Collections.emptyList();
-        int costoTotal = camino.isEmpty() ? 0 : camino.size() - 1;
-        return new ResultadoAlgoritmo("DFS", encontrado, ordenVisita, camino, costoTotal, tiempoMs);
+        this.ultimoCamino = this.solucionEncontrada ? reconstruirCamino(padres) : Collections.emptyList();
+        int movimientos = this.solucionEncontrada ? Math.max(0, this.ultimoCamino.size() - 1) : -1;
+        this.ultimoResultado = new ResultadoAlgoritmo("DFS", this.solucionEncontrada, ordenVisita, this.ultimoCamino, movimientos, tiempoMs);
+        return ordenVisita;
     }
 
-    public ResultadoAlgoritmo BFS(boolean pasoAPaso, int pausaMs) {
+    public List<Vertice> ejecutarBFS(boolean pasoAPaso, int pausaMs) {
         long tInicio = System.nanoTime();
-        Set<Integer> visitadosIds = new HashSet<>();
+        this.ultimoCamino = new ArrayList<>();
+        this.solucionEncontrada = false;
+
+        Set<Integer> encoladosIds = new HashSet<>();
         List<Vertice> ordenVisita = new ArrayList<>();
         Map<Integer, Integer> padres = new HashMap<>();
         padres.put(inicio.getId(), null);
-        boolean encontrado = false;
 
         Queue<Vertice> cola = new LinkedList<>();
         cola.offer(inicio);
-        visitadosIds.add(inicio.getId());
+        encoladosIds.add(inicio.getId());
 
         while (!cola.isEmpty()) {
             Vertice actual = cola.poll();
             ordenVisita.add(actual);
 
-            if (pasoAPaso) imprimirFrame("BFS", visitadosIds, actual, ordenVisita.size(), pausaMs);
+            if (pasoAPaso) {
+                Set<Integer> visitadosHastaAhora = new HashSet<>();
+                for (Vertice v : ordenVisita) visitadosHastaAhora.add(v.getId());
+                imprimirFrame("BFS", visitadosHastaAhora, actual, ordenVisita.size(), pausaMs);
+            }
 
             if (actual.equals(fin)) {
-                encontrado = true;
+                this.solucionEncontrada = true;
                 break;
             }
 
             for (Arcos arco : listasAdyacencia.get(actual.getId())) {
                 Vertice vec = arco.getDestino();
-                if (!visitadosIds.contains(vec.getId())) {
-                    visitadosIds.add(vec.getId());
+                if (!encoladosIds.contains(vec.getId())) {
+                    encoladosIds.add(vec.getId());
                     padres.put(vec.getId(), actual.getId());
                     cola.offer(vec);
                 }
@@ -239,14 +273,17 @@ public class Grafo {
         }
 
         double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
-        List<Vertice> camino = encontrado ? reconstruirCamino(padres) : Collections.emptyList();
-        int costoTotal = camino.isEmpty() ? 0 : camino.size() - 1;
-        return new ResultadoAlgoritmo("BFS", encontrado, ordenVisita, camino, costoTotal, tiempoMs);
+        this.ultimoCamino = this.solucionEncontrada ? reconstruirCamino(padres) : Collections.emptyList();
+        int movimientos = this.solucionEncontrada ? Math.max(0, this.ultimoCamino.size() - 1) : -1;
+        this.ultimoResultado = new ResultadoAlgoritmo("BFS", this.solucionEncontrada, ordenVisita, this.ultimoCamino, movimientos, tiempoMs);
+        return ordenVisita;
     }
 
-    // Dijkstra para el camino más corto
-    public ResultadoAlgoritmo caminoMasCorto(boolean pasoAPaso, int pausaMs) {
+    public List<Vertice> ejecutarDijkstra(boolean pasoAPaso, int pausaMs) {
         long tInicio = System.nanoTime();
+        this.ultimoCamino = new ArrayList<>();
+        this.solucionEncontrada = false;
+
         Set<Integer> visitadosIds = new HashSet<>();
         List<Vertice> ordenVisita = new ArrayList<>();
         Map<Integer, Integer> padres = new HashMap<>();
@@ -258,14 +295,17 @@ public class Grafo {
         dist.put(inicio.getId(), 0);
         padres.put(inicio.getId(), null);
 
-        PriorityQueue<int[]> pq = new PriorityQueue<>(Comparator.comparingInt(a -> a[1]));
-pq.offer(new int[]{inicio.getId(), 0});
-        boolean encontrado = false;
+        // Desempate reproducible por ID menor del vértice (Issue #4)
+        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> {
+            int cmpDist = Integer.compare(a[1], b[1]);
+            return (cmpDist != 0) ? cmpDist : Integer.compare(a[0], b[0]);
+        });
+        pq.offer(new int[]{inicio.getId(), 0});
 
         while (!pq.isEmpty()) {
             int[] entry = pq.poll();
             int actualId = entry[0];
-            int costoAct = entry[1] ;
+            int costoAct = entry[1];
 
             if (visitadosIds.contains(actualId)) continue;
             visitadosIds.add(actualId);
@@ -275,7 +315,7 @@ pq.offer(new int[]{inicio.getId(), 0});
             if (pasoAPaso) imprimirFrame("Dijkstra", visitadosIds, actual, ordenVisita.size(), pausaMs);
 
             if (actual.equals(fin)) {
-                encontrado = true;
+                this.solucionEncontrada = true;
                 break;
             }
 
@@ -293,9 +333,10 @@ pq.offer(new int[]{inicio.getId(), 0});
         }
 
         double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
-        List<Vertice> camino = encontrado ? reconstruirCamino(padres) : Collections.emptyList();
-        int costoTotal = camino.isEmpty() ? 0 : dist.get(fin.getId());
-        return new ResultadoAlgoritmo("Dijkstra", encontrado, ordenVisita, camino, costoTotal, tiempoMs);
+        this.ultimoCamino = this.solucionEncontrada ? reconstruirCamino(padres) : Collections.emptyList();
+        int movimientos = this.solucionEncontrada ? Math.max(0, this.ultimoCamino.size() - 1) : -1;
+        this.ultimoResultado = new ResultadoAlgoritmo("Dijkstra", this.solucionEncontrada, ordenVisita, this.ultimoCamino, movimientos, tiempoMs);
+        return ordenVisita;
     }
 
     private List<Vertice> reconstruirCamino(Map<Integer, Integer> padres) {
@@ -318,9 +359,9 @@ pq.offer(new int[]{inicio.getId(), 0});
                 if (actual != null && actual.getFila() == r && actual.getColumna() == c) {
                     sb.append('@');
                 } else if (inicio.getFila() == r && inicio.getColumna() == c) {
-                    sb.append('S');
-                } else if (fin.getFila() == r && fin.getColumna() == c) {
                     sb.append('E');
+                } else if (fin.getFila() == r && fin.getColumna() == c) {
+                    sb.append('S');
                 } else {
                     Vertice v = vertices.buscarPorCoordenada(r, c);
                     if (v != null && caminoIds != null && caminoIds.contains(v.getId())) {
@@ -339,7 +380,7 @@ pq.offer(new int[]{inicio.getId(), 0});
 
     private void imprimirFrame(String algoritmo, Set<Integer> visitadosIds, Vertice actual, int paso, int pausaMs) {
         System.out.println("\n=== Explorando con " + algoritmo + " | Paso #" + paso + " ===");
-        System.out.println("Leyenda: S=Inicio | E=Salida | @=Actual | ·=Visitado");
+        System.out.println("Leyenda: E=Entrada | S=Salida | @=Actual | ·=Visitado");
         System.out.println(renderizar(visitadosIds, actual, null));
         try {
             Thread.sleep(pausaMs);
