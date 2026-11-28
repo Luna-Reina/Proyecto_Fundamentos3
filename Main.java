@@ -10,61 +10,53 @@ public class Main {
         return ids;
     }
 
-    private static void ejecutarYDesplegarPasoAPaso(Grafo grafo, ResultadoAlgoritmo res, Scanner scanner) {
-        System.out.println("\n¿Cómo deseas visualizar la exploración paso a paso?");
-        System.out.println("1. Pausa automática (configurable en milisegundos)");
-        System.out.println("2. Manual (avanzar presionando ENTER)");
-        System.out.print("Elige modo (1 o 2): ");
-        String modo = scanner.nextLine().trim();
-
-        if (modo.equals("2")) {
-            grafo.despliegaLaberinto(res, true, 0, scanner);
-        } else {
-            System.out.print("Ingresa la pausa en milisegundos (ej. 150, Enter para 150): ");
-            String pausaStr = scanner.nextLine().trim();
-            int pausaMs = 150;
-            if (!pausaStr.isEmpty()) {
-                try {
-                    pausaMs = Math.max(0, Integer.parseInt(pausaStr));
-                } catch (NumberFormatException e) {
-                    System.out.println("[INFO] Valor no numérico; usando 150 ms por defecto.");
-                }
-            }
-            grafo.despliegaLaberinto(res, false, pausaMs, scanner);
-        }
-    }
-
     private static void compararSoluciones(Grafo grafo, Map<String, ResultadoAlgoritmo> resultados) {
-        System.out.println("COMPARACIÓN DE LAS TRES SOLUCIONES");
+        System.out.println("----------------------------------------------------------");
+        System.out.println("           COMPARACIÓN DE LAS TRES SOLUCIONES");
+        System.out.println("----------------------------------------------------------");
 
-        if (!resultados.containsKey("DFS")) resultados.put("DFS", grafo.DFS());
-        if (!resultados.containsKey("BFS")) resultados.put("BFS", grafo.BFS());
-        if (!resultados.containsKey("Dijkstra")) resultados.put("Dijkstra", grafo.caminoMasCorto());
+        
+        if (!resultados.containsKey("DFS")) {
+            grafo.DFS();
+            resultados.put("DFS", grafo.getUltimoResultado());
+        }
+        if (!resultados.containsKey("BFS")) {
+            grafo.BFS();
+            resultados.put("BFS", grafo.getUltimoResultado());
+        }
+        if (!resultados.containsKey("Dijkstra")) {
+            grafo.caminoMasCorto();
+            resultados.put("Dijkstra", grafo.getUltimoResultado());
+        }
 
         String[] nombres = {"DFS", "BFS", "Dijkstra"};
         for (String nombre : nombres) {
             ResultadoAlgoritmo res = resultados.get(nombre);
-            System.out.println("\n>>> Mapa solución " + nombre + " (* = camino final, · = visitado):");
+            System.out.println("\n>>> " + nombre + " (Leyenda: E=Entrada, S=Salida, *=Camino final, ·=Visitado):");
             if (res.encontrado) {
                 System.out.println(grafo.renderizar(extraerIds(res.ordenVisita), null, extraerIds(res.camino)));
+                System.out.println("Vértices visitados: " + res.ordenVisita.size() +
+                        " | Movimientos: " + (res.camino.size() - 1) +
+                        String.format(" | Tiempo: %.4f ms", res.tiempoMs));
             } else {
-                System.out.println("Sin solución (explorados = ·):");
                 System.out.println(grafo.renderizar(extraerIds(res.ordenVisita), null, null));
+                System.out.println("Aviso: No hay solución hacia la salida. | Vértices visitados: " +
+                        res.ordenVisita.size() + String.format(" | Tiempo: %.4f ms", res.tiempoMs));
             }
         }
 
-        System.out.println("\n----------------------------------------------------------------");
-        System.out.printf("%-12s | %-10s | %-12s | %-18s%n",
-                "Algoritmo", "¿Solución?", "Visitados", "Movimientos ruta");
-        System.out.println("----------------------------------------------------------------");
+        System.out.println("\n-----------------------------------------------------------------------------");
+        System.out.printf("%-10s | %-10s | %-11s | %-18s | %-14s%n",
+                "Algoritmo", "¿Solución?", "Visitados", "Movimientos ruta", "Tiempo (ms)");
+        System.out.println("-----------------------------------------------------------------------------");
         for (String nombre : nombres) {
             ResultadoAlgoritmo r = resultados.get(nombre);
             String sol = r.encontrado ? "Sí" : "No";
             String movs = r.encontrado ? String.valueOf(r.camino.size() - 1) : "Sin camino";
-            System.out.printf("%-12s | %-10s | %-12d | %-18s%n",
-                    nombre, sol, r.ordenVisita.size(), movs);
+            System.out.printf("%-10s | %-10s | %-11d | %-18s | %-14.4f%n",
+                    nombre, sol, r.ordenVisita.size(), movs, r.tiempoMs);
         }
-        System.out.println("----------------------------------------------------------------");
+        System.out.println("-----------------------------------------------------------------------------");
     }
 
     public static void main(String[] args) {
@@ -74,13 +66,16 @@ public class Main {
         Map<String, ResultadoAlgoritmo> resultados = new HashMap<>();
 
         while (true) {
-            System.out.println("RESOLUTOR DE LABERINTOS (GRAFOS)");
+            System.out.println("\n------------------------------------------");
+            System.out.println("      RESOLUTOR DE LABERINTOS (GRAFOS)");
+            System.out.println("--------------------------------------------");
             System.out.println("1. Cargar laberinto");
             System.out.println("2. Resolver laberinto con DFS");
             System.out.println("3. Resolver laberinto con BFS");
             System.out.println("4. Resolver laberinto con Dijkstra (camino más corto)");
             System.out.println("5. Mostrar las tres soluciones");
             System.out.println("6. Salir");
+            System.out.println("---------------------------------------------");
             System.out.print("Selecciona una opción (1-6): ");
 
             String opcion = scanner.nextLine().trim();
@@ -110,17 +105,20 @@ public class Main {
                 }
 
                 if (opcion.equals("2")) {
-                    ResultadoAlgoritmo res = grafo.DFS();
-                    resultados.put("DFS", res);
-                    ejecutarYDesplegarPasoAPaso(grafo, res, scanner);
+                    List<Vertice> ordenVisita = grafo.DFS();
+                    resultados.put("DFS", grafo.getUltimoResultado());
+                    grafo.despliegaLaberinto(ordenVisita);
+
                 } else if (opcion.equals("3")) {
-                    ResultadoAlgoritmo res = grafo.BFS();
-                    resultados.put("BFS", res);
-                    ejecutarYDesplegarPasoAPaso(grafo, res, scanner);
+                    List<Vertice> ordenVisita = grafo.BFS();
+                    resultados.put("BFS", grafo.getUltimoResultado());
+                    grafo.despliegaLaberinto(ordenVisita);
+
                 } else if (opcion.equals("4")) {
-                    ResultadoAlgoritmo res = grafo.caminoMasCorto();
-                    resultados.put("Dijkstra", res);
-                    ejecutarYDesplegarPasoAPaso(grafo, res, scanner);
+                    List<Vertice> ordenVisita = grafo.caminoMasCorto();
+                    resultados.put("Dijkstra", grafo.getUltimoResultado());
+                    grafo.despliegaLaberinto(ordenVisita);
+
                 } else {
                     compararSoluciones(grafo, resultados);
                 }
