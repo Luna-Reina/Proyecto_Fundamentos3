@@ -408,4 +408,54 @@ public class Grafo {
         }
         return sb.toString();
     }
+
+  
+    // extra caracteres Unicode alternativos (┌ ┐ └ ┘ ─ │ █ ·)
+
+    public String renderizarEstilizado(Set<Integer> visitadosIds, Vertice actual, Set<Integer> caminoIds) {
+        StringBuilder sb = new StringBuilder();
+        for (int r = 0; r < filas; r++) {
+            for (int c = 0; c < columnas; c++) {
+                char orig = matriz[r][c];
+                if (actual != null && actual.getFila() == r && actual.getColumna() == c) {
+                    sb.append('@');
+                } else if (inicio.getFila() == r && inicio.getColumna() == c) {
+                    sb.append('E');
+                } else if (fin.getFila() == r && fin.getColumna() == c) {
+                    sb.append('S');
+                } else {
+                    Vertice v = vertices.buscarPorCoordenada(r, c);
+                    if (v != null && caminoIds != null && caminoIds.contains(v.getId())) {
+                        sb.append('*');
+                    } else if (v != null && visitadosIds != null && visitadosIds.contains(v.getId())) {
+                        sb.append('·');
+                    } else if (esPared(orig)) {
+                        sb.append(obtenerCaracterParedUnicode(r, c, orig));
+                    } else {
+                        sb.append(' ');
+                    }
+                }
+            }
+            if (r < filas - 1) sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    private char obtenerCaracterParedUnicode(int r, int c, char orig) {
+        boolean arriba = (r > 0) && esPared(matriz[r - 1][c]);
+        boolean abajo = (r < filas - 1) && esPared(matriz[r + 1][c]);
+        boolean izq = (c > 0) && esPared(matriz[r][c - 1]);
+        boolean der = (c < columnas - 1) && esPared(matriz[r][c + 1]);
+
+        if (orig == '+') {
+            if (abajo && der && !arriba && !izq) return '┌';
+            if (abajo && izq && !arriba && !der) return '┐';
+            if (arriba && der && !abajo && !izq) return '└';
+            if (arriba && izq && !abajo && !der) return '┘';
+            return '█';
+        }
+        if (orig == '-') return '─';
+        if (orig == '|') return '│';
+        return '█';
+    }
 }
