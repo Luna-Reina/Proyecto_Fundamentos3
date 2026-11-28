@@ -2,21 +2,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Scanner;
-import java.util.Set;
+import java.util.*;
 
 public class Grafo {
     private char[][] matriz;
@@ -28,7 +14,7 @@ public class Grafo {
     private final Vertices vertices;
     private final Hashtable<Integer, LinkedList<Arcos>> listasAdyacencia;
 
-
+    // Estado de la última ejecución (Issues #4, #5 y #6)
     private List<Vertice> ultimoCamino;
     private boolean solucionEncontrada;
     private ResultadoAlgoritmo ultimoResultado;
@@ -50,6 +36,14 @@ public class Grafo {
 
     public ResultadoAlgoritmo getUltimoResultado() {
         return ultimoResultado;
+    }
+
+    public Vertices getVertices() {
+        return vertices;
+    }
+
+    public Hashtable<Integer, LinkedList<Arcos>> getListasAdyacencia() {
+        return listasAdyacencia;
     }
 
     public void cargarDesdeArchivo(String ruta) throws Exception {
@@ -112,7 +106,11 @@ public class Grafo {
             }
         }
 
-        if (coordInicio == null && coordFin == null) {
+        if (coordInicio != null || coordFin != null) {
+            if (coordInicio == null || coordFin == null) {
+                throw new Exception("Debe existir tanto 'E' (entrada) como 'S' (salida).");
+            }
+        } else {
             List<int[]> aberturas = new ArrayList<>();
             for (int r = 0; r < nFilas; r++) {
                 for (int c = 0; c < ancho; c++) {
@@ -163,7 +161,8 @@ public class Grafo {
             }
         }
 
-        int[][] dirs = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        // Orden  Issue 4 Arriba, Derecha, Abajo, Izquierda
+        int[][] dirs = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
         for (int r = 0; r < filas; r++) {
             for (int c = 0; c < columnas; c++) {
                 Vertice actual = mapaTemp[r][c];
@@ -181,7 +180,9 @@ public class Grafo {
         }
     }
 
-    public ResultadoAlgoritmo DFS() {
+
+
+    public List<Vertice> DFS() {
         long tInicio = System.nanoTime();
         this.ultimoCamino = new ArrayList<>();
         this.solucionEncontrada = false;
@@ -206,7 +207,7 @@ public class Grafo {
                 break;
             }
 
-  
+            //  orden inverso  Arriba, Derecha, Abajo, Izquierda
             LinkedList<Arcos> vecinos = listasAdyacencia.get(actual.getId());
             for (int i = vecinos.size() - 1; i >= 0; i--) {
                 Vertice vec = vecinos.get(i).getDestino();
@@ -217,14 +218,14 @@ public class Grafo {
             }
         }
 
-        double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         this.ultimoCamino = this.solucionEncontrada ? reconstruirCamino(padres) : Collections.emptyList();
+        double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         int movimientos = this.solucionEncontrada ? Math.max(0, this.ultimoCamino.size() - 1) : -1;
         this.ultimoResultado = new ResultadoAlgoritmo("DFS", this.solucionEncontrada, ordenVisita, this.ultimoCamino, movimientos, tiempoMs);
         return ordenVisita;
     }
 
-    public ResultadoAlgoritmo BFS() {
+    public List<Vertice> BFS() {
         long tInicio = System.nanoTime();
         this.ultimoCamino = new ArrayList<>();
         this.solucionEncontrada = false;
@@ -257,15 +258,14 @@ public class Grafo {
             }
         }
 
-        double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         this.ultimoCamino = this.solucionEncontrada ? reconstruirCamino(padres) : Collections.emptyList();
+        double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         int movimientos = this.solucionEncontrada ? Math.max(0, this.ultimoCamino.size() - 1) : -1;
         this.ultimoResultado = new ResultadoAlgoritmo("BFS", this.solucionEncontrada, ordenVisita, this.ultimoCamino, movimientos, tiempoMs);
         return ordenVisita;
     }
 
-    public ResultadoAlgoritmo caminoMasCorto() {
-    public List<Vertice> ejecutarDijkstra(boolean pasoAPaso, int pausaMs) {
+    public List<Vertice> caminoMasCorto() {
         long tInicio = System.nanoTime();
         this.ultimoCamino = new ArrayList<>();
         this.solucionEncontrada = false;
@@ -281,10 +281,7 @@ public class Grafo {
         dist.put(inicio.getId(), 0);
         padres.put(inicio.getId(), null);
 
-        PriorityQueue<int[]> pq = new PriorityQueue<>(Comparator.comparingInt(a -> a[1]));
-        pq.offer(new int[]{inicio.getId(), 0});
-        boolean encontrado = false;
-        // Desempate reproducible por ID menor del vértice (Issue #4)
+        
         PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> {
             int cmpDist = Integer.compare(a[1], b[1]);
             return (cmpDist != 0) ? cmpDist : Integer.compare(a[0], b[0]);
@@ -319,11 +316,58 @@ public class Grafo {
             }
         }
 
-        double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         this.ultimoCamino = this.solucionEncontrada ? reconstruirCamino(padres) : Collections.emptyList();
+        double tiempoMs = (System.nanoTime() - tInicio) / 1_000_000.0;
         int movimientos = this.solucionEncontrada ? Math.max(0, this.ultimoCamino.size() - 1) : -1;
         this.ultimoResultado = new ResultadoAlgoritmo("Dijkstra", this.solucionEncontrada, ordenVisita, this.ultimoCamino, movimientos, tiempoMs);
         return ordenVisita;
+    }
+
+
+
+    public void despliegaLaberinto(List<Vertice> ordenVisita) {
+        despliegaLaberinto(ordenVisita, 120);
+    }
+
+    public void despliegaLaberinto(List<Vertice> ordenVisita, int pausaMs) {
+        String nombreAlg = (ultimoResultado != null) ? ultimoResultado.nombre : "Algoritmo";
+        Set<Integer> visitadosIds = new HashSet<>();
+
+        for (int i = 0; i < ordenVisita.size(); i++) {
+            Vertice actual = ordenVisita.get(i);
+            visitadosIds.add(actual.getId());
+
+            System.out.println("\n=== Explorando con " + nombreAlg + " | Paso #" + (i + 1) + " de " + ordenVisita.size() + " ===");
+            System.out.println("Leyenda: E=Entrada | S=Salida | @=Vértice actual | ·=Visitado | *=Camino final");
+            System.out.println(renderizar(visitadosIds, actual, null));
+
+            try {
+                Thread.sleep(pausaMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        System.out.println("\n=== Resultado final (" + nombreAlg + ") ===");
+        System.out.println("Leyenda: E=Entrada | S=Salida | ·=Visitado | *=Camino final");
+
+        if (solucionEncontrada) {
+            Set<Integer> caminoIds = new HashSet<>();
+            for (Vertice v : ultimoCamino) {
+                caminoIds.add(v.getId());
+            }
+            System.out.println(renderizar(visitadosIds, null, caminoIds));
+            System.out.println("\n* Vértices visitados     : " + ordenVisita.size());
+            System.out.println("* Longitud (movimientos) : " + (ultimoCamino.size() - 1));
+        } else {
+            System.out.println(renderizar(visitadosIds, null, null));
+            System.out.println("\n[SIN SOLUCIÓN] No existe camino entre la entrada y la salida.");
+            System.out.println("* Vértices visitados     : " + ordenVisita.size());
+        }
+
+        if (ultimoResultado != null) {
+            System.out.printf("* Tiempo puro ejecución  : %.4f ms%n", ultimoResultado.tiempoMs);
+        }
     }
 
     private List<Vertice> reconstruirCamino(Map<Integer, Integer> padres) {
@@ -336,53 +380,6 @@ public class Grafo {
         }
         Collections.reverse(camino);
         return camino;
-    }
-
-    public void despliegaLaberinto(ResultadoAlgoritmo resultado, boolean usarTecla, int pausaMs, Scanner scanner) {
-        List<Vertice> ordenVisita = resultado.ordenVisita;
-        Set<Integer> visitadosHastaAhora = new HashSet<>();
-
-        for (int i = 0; i < ordenVisita.size(); i++) {
-            Vertice actual = ordenVisita.get(i);
-            visitadosHastaAhora.add(actual.getId());
-
-            System.out.println("\n=== [" + resultado.nombre + "] Paso " + (i + 1) + " de " + ordenVisita.size() +
-                    " | Vértice actual: " + actual + " ===");
-            System.out.println("Leyenda: #/+/-:| = Pared | S = Entrada | E = Salida | @ = Actual | · = Visitado");
-            System.out.println(renderizar(visitadosHastaAhora, actual, null));
-
-            if (usarTecla) {
-                System.out.print("Presiona ENTER para avanzar al siguiente paso...");
-                scanner.nextLine();
-            } else {
-                try {
-                    Thread.sleep(pausaMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        }
-
-        System.out.println("          RESULTADO FINAL - " + resultado.nombre);
-        System.out.println("Leyenda: S = Entrada | E = Salida | * = Camino final | · = Explorado sin ruta");
-
-        if (resultado.encontrado) {
-            Set<Integer> caminoIds = new HashSet<>();
-            for (Vertice v : resultado.camino) {
-                caminoIds.add(v.getId());
-            }
-            System.out.println(renderizar(visitadosHastaAhora, null, caminoIds));
-            System.out.println("\n[OK] ¡Salida encontrada!");
-            System.out.println("* Vértices explorados : " + resultado.ordenVisita.size());
-            System.out.println("* Pasos del camino    : " + (resultado.camino.size() - 1));
-            System.out.println("* Costo total         : " + resultado.costoTotal);
-            System.out.printf("* Tiempo de búsqueda  : %.4f ms%n", resultado.tiempoMs);
-        } else {
-            System.out.println(renderizar(visitadosHastaAhora, null, null));
-            System.out.println("\n[AVISO] No existe solución: no hay un camino conectado desde 'S' hasta 'E'.");
-            System.out.println("* Vértices explorados : " + resultado.ordenVisita.size());
-            System.out.printf("* Tiempo de búsqueda  : %.4f ms%n", resultado.tiempoMs);
-        }
     }
 
     public String renderizar(Set<Integer> visitadosIds, Vertice actual, Set<Integer> caminoIds) {
@@ -410,13 +407,5 @@ public class Grafo {
             if (r < filas - 1) sb.append('\n');
         }
         return sb.toString();
-    }
-
-    public Vertices getVertices() {
-        return vertices;
-    }
-
-    public Hashtable<Integer, LinkedList<Arcos>> getListasAdyacencia() {
-        return listasAdyacencia;
     }
 }
