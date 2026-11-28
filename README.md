@@ -21,11 +21,12 @@ Aplicación de consola en Java que modela un laberinto leído desde un archivo d
 ## Instrucciones para Compilar y Ejecutar
 
    -Clonar el repositorio y entrar a la carpeta del proyecto:
-   -```bash
-   -git clone [https://github.com/Luna-Reina/Proyecto_Fundamentos3.git](https://github.com/Luna-Reina/Proyecto_Fundamentos3.git)
-   -cd Proyecto_Fundamentos3
-    -compilar los archivos: javac *.java
-    -ejecutar: java Main
+  ```bash
+   git clone https://github.com/Luna-Reina/Proyecto_Fundamentos3.git
+   cd Proyecto_Fundamentos3
+   javac -encoding UTF-8 *.java
+   java Main
+   ```
 
 ## Responsabilidades de Cada Integrante
   
@@ -45,6 +46,51 @@ En cumplimiento con las normas de integridad académica del curso, se declara el
 Empresa y Modelo: Google, Gemini.
 
 Propósito de uso: Apoyo en la resolución de dudas de sintaxis en Java, depuración de errores de compilación tras fusiones de ramas en Git (git merge/git pull), verificación de casos borde en la validación de archivos .txt y estructuración de la documentación técnica del proyecto (README.md). Todo el código fue revisado, probado y adaptado por los integrantes del equipo.
+
+## Menú del Programa
+-Cargar laberinto: Lee y valida el archivo .txt, construye el grafo en memoria y limpia resultados previos.
+
+-Resolver laberinto con DFS: Ejecuta Búsqueda en Profundidad (DFS()), muestra la exploración paso a paso y el camino hallado.
+
+-Resolver laberinto con BFS: Ejecuta Búsqueda en Anchura (BFS()), muestra la exploración paso a paso y el camino óptimo.
+
+-Resolver laberinto con Dijkstra (camino más corto): Ejecuta caminoMasCorto(), muestra la exploración paso a paso y el camino de costo mínimo.
+
+-Mostrar las tres soluciones: Ejecuta sin animación los algoritmos faltantes (reutilizando resultados previos) y muestra los tres mapas junto con sus métricas y tiempos de ejecución.
+
+-Salir: Termina la ejecución del programa.
+
+## Extras. Símbolos en Consola
+
+Durante la visualización paso a paso y en los mapas de solución final se utilizan los siguientes símbolos Unicode alternativos:
+
+|Símbolo | Significado |
+| :---: | :--- |
+| `┌`, `┐`, `└`, `┘`, `─`, `│`, `█` | Paredes del laberinto (no transitables) |
+| `' '` (espacio) | Posiciones transitables sin explorar |
+| `E` | Vértice de entrada del laberinto |
+| `S` | Vértice de salida del laberinto |
+| `@` | Vértice actual siendo procesado durante la animación paso a paso |
+| `·` | Posiciones ya visitadas / exploradas por el algoritmo |
+| `*` | Vértices que conforman el camino final reconstruido desde `E` hasta `S` |
+
+## Formato del Archivo de Entrada
+
+El laberinto debe guardarse en un archivo de texto plano (por ejemplo, `maze.txt`) cumpliendo las siguientes reglas de validación:
+
+* **Estructura rectangular:** Todas las líneas no vacías deben tener exactamente la misma longitud (no se permiten tabulaciones `\t`, solo espacios).
+* **Caracteres permitidos:** Paredes (`+`, `-`, `|`), celdas transitables (espacio en blanco `' '` o `#`), entrada (`E`) y salida (`S`).
+* **Detección de entrada y salida:** Si existen marcas explícitas, debe haber exactamente una `E` y una `S`. Si no existen, el programa detecta las **2 únicas aberturas transitables en el perímetro**.
+ Ejemplo de entrada (`maze.txt`)
+
+```text
++---+---+---+---+---+
+|E      |           |
++   +   +   +---+   +
+|   |       |       |
++   +---+   +   +---+
+|           |      S|
++---+---+---+---+---+
 
 
    
